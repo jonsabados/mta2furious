@@ -39,9 +39,8 @@ type FeedHeader struct {
 }
 
 type StopTimeUpdate struct {
-	StopSequence *uint32 `json:"stopSequence,omitempty"`
 	// Must be the same as in stops.txt in the corresponding GTFS feed.
-	StopId    *string    `protobuf:"bytes,4,opt,name=stop_id,json=stopId" json:"stop_id,omitempty"`
+	StopID    string     `json:"stopID,omitempty"`
 	Arrival   *time.Time `json:"arrival,omitempty"`
 	Departure *time.Time `json:"departure,omitempty"`
 	// Provides the planned station arrival track. The following is the Manhattan
@@ -74,6 +73,8 @@ type StopTimeUpdate struct {
 	// schedule.  The rules engine for the 'countdown' clocks will remove this
 	// train from all schedule stations.
 	ActualTrack *string `json:"actualTrack,omitempty"`
+	// IsComplete represents if this TripUpdate has completed (in practice this becomes True when an assigned record drops off the feed)
+	IsComplete bool `json:"isComplete"`
 }
 
 type TripUpdate struct {
@@ -112,19 +113,19 @@ type TripStatus struct {
 	TripUpdates []TripUpdate `json:"tripUpdates"`
 }
 
-type Feed struct {
+type LiveFeed struct {
 	endpoint string
 	apiKey   string
 }
 
-func NewFeed(endpoint string, apikey string) *Feed {
-	return &Feed{
+func NewLiveFeed(endpoint string, apikey string) *LiveFeed {
+	return &LiveFeed{
 		endpoint: endpoint,
 		apiKey:   apikey,
 	}
 }
 
-func (f *Feed) CurrentFeed(ctx context.Context) (TripStatus, error) {
+func (f *LiveFeed) Feed(ctx context.Context) (TripStatus, error) {
 	// A, C, E lines
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, f.endpoint, nil)
 	if err != nil {
@@ -212,8 +213,7 @@ func convertStopTimeUpdates(raw []*wire.TripUpdate_StopTimeUpdate) []StopTimeUpd
 	for i, r := range raw {
 		nytUpdate := proto.GetExtension(r, wire.E_NyctStopTimeUpdate).(*wire.NyctStopTimeUpdate)
 		ret[i] = StopTimeUpdate{
-			StopSequence:   r.StopSequence,
-			StopId:         r.StopId,
+			StopID:         *r.StopId,
 			Arrival:        extractTime(r.Arrival),
 			Departure:      extractTime(r.Departure),
 			ScheduledTrack: nytUpdate.ScheduledTrack,

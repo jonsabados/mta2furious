@@ -15,8 +15,8 @@ func main() {
 	var out string
 	flag.StringVar(&out, "out", "output.json", "output target")
 	flag.Parse()
-	feed := mta.NewFeed("https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-ace", apiKey)
-	currentState, err := feed.CurrentFeed(ctx)
+	feed := mta.NewLiveFeed("https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-ace", apiKey)
+	currentState, err := feed.Feed(ctx)
 	if err != nil {
 		panic(err)
 	}
