@@ -1,0 +1,4 @@
+trip_id,arrival_time,departure_time,stop_id,stop_sequence,stop_headsign,pickup_type,drop_off_type,shape_dist_traveled
+ASP23GEN-1037-Sunday-00_000600_1..S03R,00:06:00,00:06:00,101S,1,,0,0,
+ASP23GEN-1037-Sunday-00_000600_1..S03R,00:07:30,00:07:30,103S,2,,0,0,
+ASP23GEN-1037-Sunday-00_000600_1..S03R,00:09:00,00:09:00,104S,3,,1,1,
