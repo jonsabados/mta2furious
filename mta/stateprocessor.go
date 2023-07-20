@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
+//go:generate mockery --name=StateOracle
 type StateOracle interface {
 	CurrentState(ctx context.Context) ([]TripUpdate, error)
 }
@@ -36,12 +37,14 @@ type StateUpdateResults struct {
 type StateProcessor struct {
 	oracle StateOracle
 	store  StateStore
+	now    func() time.Time
 }
 
 func NewStateProcessor(oracle StateOracle, store StateStore) *StateProcessor {
 	return &StateProcessor{
 		oracle: oracle,
 		store:  store,
+		now:    time.Now,
 	}
 }
 
@@ -72,7 +75,7 @@ func (p *StateProcessor) ProcessUpdates(ctx context.Context) (StateUpdateResults
 	// add any trips we haven't seen before to our new durable state
 	for _, current := range currentState {
 		if locateTrip(current.TripId, priorState) == nil {
-			zerolog.Ctx(ctx).Info().Interface("trip", current).Msg("new trip found")
+			zerolog.Ctx(ctx).Debug().Interface("trip", current).Msg("new trip found")
 			newState = append(newState, current)
 		}
 	}
@@ -100,7 +103,7 @@ func (p *StateProcessor) processTrip(ctx context.Context, trip TripUpdate, curre
 			if update.IsComplete {
 				hasCompletedStops = true
 				if !hasCompletedStopsInWindow {
-					hasCompletedStopsInWindow = isInWindow(update.Arrival) || isInWindow(update.Departure)
+					hasCompletedStopsInWindow = p.isInWindow(update.Arrival) || p.isInWindow(update.Departure)
 				}
 			}
 		}
@@ -109,11 +112,16 @@ func (p *StateProcessor) processTrip(ctx context.Context, trip TripUpdate, curre
 				zerolog.Ctx(ctx).Debug().Str("tripID", trip.TripId).Msg("trip fell off the radar with a single stop remaining, assuming completion")
 				// note - were intentionally not returning, rawUpdates will be left nil which will cause the remaining stop to be picked up as completed later
 			} else {
-				zerolog.Ctx(ctx).Warn().Interface("trip", trip).Msg("trip with completed stops fell off the radar")
+				zerolog.Ctx(ctx).Info().Interface("trip", trip).Msg("trip with completed stops fell off the radar")
 				return &trip, nil
 			}
 		} else {
-			zerolog.Ctx(ctx).Warn().Interface("trip", trip).Bool("hasCompletedStops", hasCompletedStops).Msg("trip feel off the radar and discarding")
+			if hasCompletedStops {
+				zerolog.Ctx(ctx).Debug().Interface("trip", trip).Msg("the trip")
+				zerolog.Ctx(ctx).Warn().Str("tripID", trip.TripId).Msg("trip with completed stops feel off the radar and discarding")
+			} else {
+				zerolog.Ctx(ctx).Debug().Msg("trip with no completed stops fell of the radar and discarding")
+			}
 			return nil, nil
 		}
 	} else {
@@ -179,7 +187,7 @@ func (p *StateProcessor) processTrip(ctx context.Context, trip TripUpdate, curre
 			IsAssigned:     rawState.IsAssigned,
 			Direction:      rawState.Direction,
 			StopTimeUpdate: stillPending,
-		}, nil
+		}, completed
 	}
 	zerolog.Ctx(ctx).Info().Str("tripID", trip.TripId).Msg("trip complete")
 	return nil, completed
@@ -205,6 +213,6 @@ func locateTrip(tripID string, allTrips []TripUpdate) *TripUpdate {
 	return ret
 }
 
-func isInWindow(t *time.Time) bool {
-	return t != nil && t.After(time.Now().Add(time.Minute*-30))
+func (p *StateProcessor) isInWindow(t *time.Time) bool {
+	return t != nil && t.After(p.now().Add(time.Minute*-30))
 }
