@@ -1,0 +1,6 @@
+Station ID,Complex ID,GTFS Stop ID,Division,Line,Stop Name,Borough,Daytime Routes,Structure,GTFS Latitude,GTFS Longitude,North Direction Label,South Direction Label,ADA,ADA Direction Notes,ADA NB,ADA SB,Capital Outage NB,Capital Outage SB
+1,1,R01,BMT,Astoria,Astoria-Ditmars Blvd,Q,N W,Elevated,40.775036,-73.912034,,Manhattan,0,,,,,
+7,613,R11,BMT,Astoria,Lexington Av/59 St,M,N W R,Subway,40.76266,-73.967258,Queens,Downtown & Brooklyn,0,,,,,
+79,79,N10,BMT,Sea Beach,86 St,Bk,N,Open Cut,40.592721,-73.97823,Manhattan,Coney Island,0,,,,,
+120,120,L08,BMT,Canarsie,Bedford Av,Bk,L,Subway,40.717304,-73.956872,Manhattan,Canarsie - Rockaway Parkway,1,,,,,
+143,143,A02,IND,8th Av - Fulton St,Inwood-207 St,M,A,Subway,40.868072,-73.919899,,Downtown & Brooklyn,1,,,,,
