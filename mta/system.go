@@ -1,6 +1,10 @@
 package mta
 
-import "context"
+import (
+	"context"
+
+	"github.com/rs/zerolog"
+)
 
 type Feed interface {
 	Feed(ctx context.Context) (TripStatus, error)
@@ -18,12 +22,23 @@ func NewTransitSystem(feeds ...Feed) *TransitSystem {
 
 func (t *TransitSystem) CurrentState(ctx context.Context) ([]TripUpdate, error) {
 	ret := make([]TripUpdate, 0)
+	dropCount := 0
 	for _, f := range t.feeds {
 		status, err := f.Feed(ctx)
 		if err != nil {
 			return nil, err
 		}
-		ret = append(ret, status.TripUpdates...)
+		for _, tu := range status.TripUpdates {
+			zerolog.Ctx(ctx).Trace().Interface("trip", tu).Msg("trip observed")
+			if tu.IsAssigned {
+				ret = append(ret, tu)
+			} else {
+				dropCount++
+			}
+		}
+	}
+	if dropCount > 0 {
+		zerolog.Ctx(ctx).Info().Int("dropCount", dropCount).Msg("filtered out unassigned trips")
 	}
 	return ret, nil
 }

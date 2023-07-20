@@ -72,6 +72,7 @@ func (p *StateProcessor) ProcessUpdates(ctx context.Context) (StateUpdateResults
 	// add any trips we haven't seen before to our new durable state
 	for _, current := range currentState {
 		if locateTrip(current.TripId, priorState) == nil {
+			zerolog.Ctx(ctx).Info().Interface("trip", current).Msg("new trip found")
 			newState = append(newState, current)
 		}
 	}
@@ -90,8 +91,32 @@ func (p *StateProcessor) ProcessUpdates(ctx context.Context) (StateUpdateResults
 func (p *StateProcessor) processTrip(ctx context.Context, trip TripUpdate, currentState []TripUpdate) (*TripUpdate, []Segment) {
 	var rawUpdates []StopTimeUpdate
 	rawState := locateTrip(trip.TripId, currentState)
-	// if rawState is nil the trip is complete - rather than have specific logic for that we can also just treat it as being present but with an empty list of updates
-	if rawState != nil {
+
+	if rawState == nil {
+		// sometimes trips don't appear in some pulls of the feed and then re-appear, if there are some completed segments we should retain it, otherwise drop
+		hasCompletedStops := false
+		hasCompletedStopsInWindow := false
+		for _, update := range trip.StopTimeUpdate {
+			if update.IsComplete {
+				hasCompletedStops = true
+				if !hasCompletedStopsInWindow {
+					hasCompletedStopsInWindow = isInWindow(update.Arrival) || isInWindow(update.Departure)
+				}
+			}
+		}
+		if hasCompletedStops && hasCompletedStopsInWindow {
+			if len(trip.StopTimeUpdate) == 2 && trip.StopTimeUpdate[0].IsComplete {
+				zerolog.Ctx(ctx).Debug().Str("tripID", trip.TripId).Msg("trip fell off the radar with a single stop remaining, assuming completion")
+				// note - were intentionally not returning, rawUpdates will be left nil which will cause the remaining stop to be picked up as completed later
+			} else {
+				zerolog.Ctx(ctx).Warn().Interface("trip", trip).Msg("trip with completed stops fell off the radar")
+				return &trip, nil
+			}
+		} else {
+			zerolog.Ctx(ctx).Warn().Interface("trip", trip).Bool("hasCompletedStops", hasCompletedStops).Msg("trip feel off the radar and discarding")
+			return nil, nil
+		}
+	} else {
 		rawUpdates = rawState.StopTimeUpdate
 	}
 
@@ -146,18 +171,18 @@ func (p *StateProcessor) processTrip(ctx context.Context, trip TripUpdate, curre
 		}
 	}
 
-	var newUpdate *TripUpdate
 	if len(stillPending) > 0 {
-		newUpdate = &TripUpdate{
+		return &TripUpdate{
 			TripId:         rawState.TripId,
 			RouteId:        rawState.RouteId,
 			TrainId:        rawState.TrainId,
 			IsAssigned:     rawState.IsAssigned,
 			Direction:      rawState.Direction,
 			StopTimeUpdate: stillPending,
-		}
+		}, nil
 	}
-	return newUpdate, completed
+	zerolog.Ctx(ctx).Info().Str("tripID", trip.TripId).Msg("trip complete")
+	return nil, completed
 }
 
 func locateStop(stopID string, updates []StopTimeUpdate) *StopTimeUpdate {
@@ -178,4 +203,8 @@ func locateTrip(tripID string, allTrips []TripUpdate) *TripUpdate {
 		}
 	}
 	return ret
+}
+
+func isInWindow(t *time.Time) bool {
+	return t != nil && t.After(time.Now().Add(time.Minute*-30))
 }
