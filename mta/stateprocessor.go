@@ -118,7 +118,7 @@ func (p *StateProcessor) processTrip(ctx context.Context, trip TripUpdate, curre
 		} else {
 			if hasCompletedStops {
 				zerolog.Ctx(ctx).Debug().Interface("trip", trip).Msg("the trip")
-				zerolog.Ctx(ctx).Warn().Str("tripID", trip.TripId).Msg("trip with completed stops feel off the radar and discarding")
+				zerolog.Ctx(ctx).Warn().Str("tripID", trip.TripId).Msg("trip with completed stops fell off the radar and was discarded")
 			} else {
 				zerolog.Ctx(ctx).Debug().Msg("trip with no completed stops fell of the radar and discarding")
 			}
